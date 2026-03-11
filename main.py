@@ -246,7 +246,8 @@ class SubscriptionManager:
     
     def _parse_trojan(self, url: str) -> Optional[dict]:
         """解析 trojan:// 链接"""
-        # trojan://password@server:port?sni=xxx#name
+        # trojan://password@server:port?params#name
+        # 支持参数: sni, type, host, serviceName, path 等
         parsed = urlparse(url)
         
         proxy = {
@@ -261,11 +262,37 @@ class SubscriptionManager:
         
         # 解析查询参数
         query = parse_qs(parsed.query)
+        
+        # SNI (优先使用 sni 参数，其次使用 host 参数)
         if 'sni' in query:
             proxy['sni'] = query['sni'][0]
-        if 'type' in query and query['type'][0] == 'ws':
+        elif 'host' in query:
+            proxy['sni'] = query['host'][0]
+        
+        # 传输层类型
+        net_type = query.get('type', [None])[0]
+        if net_type == 'ws':
             proxy['network'] = 'ws'
-            proxy['ws-opts'] = {'path': query.get('path', ['/'])[0]}
+            ws_opts = {}
+            if 'path' in query:
+                ws_opts['path'] = query['path'][0]
+            if 'host' in query:
+                ws_opts['headers'] = {'Host': query['host'][0]}
+            if ws_opts:
+                proxy['ws-opts'] = ws_opts
+        elif net_type == 'grpc':
+            proxy['network'] = 'grpc'
+            grpc_opts = {}
+            if 'serviceName' in query:
+                grpc_opts['grpc-service-name'] = query['serviceName'][0]
+            if 'grpc-service-name' in query:
+                grpc_opts['grpc-service-name'] = query['grpc-service-name'][0]
+            if grpc_opts:
+                proxy['grpc-opts'] = grpc_opts
+        
+        # skip-cert-verify
+        if query.get('allowInsecure', ['0'])[0] == '1':
+            proxy['skip-cert-verify'] = True
         
         return proxy
     
@@ -657,6 +684,39 @@ def cli_add_proxy(args):
         print(f"✗ 添加失败: {e}")
 
 
+def cli_add_url(args):
+    """通过 URL 添加节点"""
+    mgr = SubscriptionManager()
+    
+    proxy = mgr._parse_proxy_url(args.url)
+    if not proxy:
+        print(f"✗ 无法解析链接，支持的格式: vmess://, trojan://, ss://, ssr://")
+        return
+    
+    # 如果指定了名称，覆盖解析出的名称
+    if args.name:
+        proxy['name'] = args.name
+    
+    try:
+        mgr.add_proxy(proxy)
+        print(f"✓ 节点添加成功: {proxy['name']}")
+        print(f"  类型: {proxy['type']}")
+        print(f"  服务器: {proxy['server']}:{proxy['port']}")
+    except ValueError as e:
+        if '已存在' in str(e):
+            # 节点已存在，询问是否更新
+            print(f"! 节点已存在: {proxy['name']}")
+            if args.force:
+                mgr.update_proxy(proxy['name'], proxy)
+                print(f"✓ 节点已更新: {proxy['name']}")
+            else:
+                print(f"  使用 --force 强制更新")
+        else:
+            print(f"✗ 添加失败: {e}")
+    except Exception as e:
+        print(f"✗ 添加失败: {e}")
+
+
 def cli_delete_proxy(args):
     """删除节点"""
     mgr = SubscriptionManager()
@@ -941,6 +1001,13 @@ def main():
     p_del = subparsers.add_parser('delete', help='删除节点')
     p_del.add_argument('name', help='节点名称')
     p_del.set_defaults(func=cli_delete_proxy)
+    
+    # 通过 URL 添加节点
+    p_add_url = subparsers.add_parser('add-url', help='通过 URL 添加节点 (vmess://, trojan://, ss://, ssr://)')
+    p_add_url.add_argument('url', help='代理链接')
+    p_add_url.add_argument('--name', help='自定义节点名称 (可选)')
+    p_add_url.add_argument('--force', action='store_true', help='强制更新已存在的节点')
+    p_add_url.set_defaults(func=cli_add_url)
     
     p_clear = subparsers.add_parser('clear', help='清空节点')
     p_clear.add_argument('--source', help='指定订阅源 ID')
