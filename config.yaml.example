@@ -1,0 +1,61 @@
+# Clash 配置示例文件
+# 复制此文件为 config.yaml 并填入你的节点信息
+
+port: 7890
+socks-port: 7891
+allow-lan: true
+mode: Rule
+log-level: info
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  enhanced-mode: fake-ip
+  nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+
+proxies:
+  # 示例 Trojan 节点
+  # - name: "节点名称"
+  #   type: trojan
+  #   server: example.com
+  #   port: 443
+  #   password: "your-password"
+  #   udp: true
+  #   tls: true
+  #   network: grpc
+  #   grpc-opts:
+  #     grpc-service-name: "your-service-name"
+
+  # 示例 VMess 节点
+  # - name: "节点名称"
+  #   type: vmess
+  #   server: example.com
+  #   port: 443
+  #   uuid: "your-uuid"
+  #   alterId: 0
+  #   cipher: auto
+  #   udp: true
+
+proxy-groups:
+  - name: Proxies
+    type: select
+    proxies:
+      - 自动选择
+      - 手动选择
+
+  - name: 自动选择
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    proxies: []
+
+  - name: 手动选择
+    type: select
+    proxies: []
+
+rules:
+  - GEOIP,CN,DIRECT
+  - MATCH,Proxies

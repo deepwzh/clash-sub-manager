@@ -1,0 +1,21 @@
+# 敏感数据文件 - 不提交到 Git
+config.yaml
+subs.json
+sources.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

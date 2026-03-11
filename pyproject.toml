@@ -1,0 +1,22 @@
+[project]
+name = "clash-sub-manager"
+version = "0.2.0"
+description = "Clash 订阅管理器 - 读取本地配置，支持远程订阅源，生成订阅链接"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "httpx>=0.25.0",
+]
+
+[project.scripts]
+clash-sub = "main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
