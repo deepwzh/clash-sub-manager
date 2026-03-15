@@ -10,6 +10,7 @@ Clash 订阅管理器
 import argparse
 import base64
 import json
+import logging
 import os
 import re
 import yaml
@@ -24,6 +25,13 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, HTMLResponse, Response
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # 配置
 DEFAULT_CONFIG = Path(__file__).parent / "config.yaml"
@@ -663,8 +671,14 @@ class SubscriptionManager:
     
     # === 订阅输出 ===
     
-    def generate_subscription(self, token: str, format: str = 'yaml') -> Optional[str]:
-        """生成订阅内容"""
+    def generate_subscription(self, token: str, format: str = 'yaml', enable_rule_providers: bool = True) -> Optional[str]:
+        """生成订阅内容
+        
+        Args:
+            token: 订阅 token
+            format: 输出格式 (yaml/base64)
+            enable_rule_providers: 是否启用 rule-providers（Meta 内核支持）
+        """
         if token not in self.subscriptions:
             return None
         
@@ -740,8 +754,8 @@ class SubscriptionManager:
         
         output['rules'] = self.config.get('rules', ['MATCH,Proxies'])
         
-        # 添加 rule-providers（如果有）
-        if self.providers:
+        # 添加 rule-providers（如果有且客户端支持）
+        if enable_rule_providers and self.providers:
             rule_providers = {}
             provider_rules = []
             
@@ -1109,20 +1123,33 @@ def cli_serve(args):
     
     @app.get("/sub/{token}")
     async def get_subscription(request: Request, token: str):
-        # 检查 User-Agent，只允许 Clash 客户端访问
+        # 记录 User-Agent
         ua = request.headers.get('user-agent', '')
+        client_ip = request.client.host if request.client else 'unknown'
+        logger.info(f"订阅请求: token={token}, UA={ua}, IP={client_ip}")
         
-        # 允许的客户端：Clash, ClashMeta, ClashX, Stash, Shadowrocket 等
-        allowed_clients = ['Clash', 'clash', 'Stash', 'stash', 'Shadowrocket']
+        # 检查 User-Agent
+        # 1. 判断是否是 Meta 内核（支持 RULE-SET）
+        is_meta = any(meta in ua for meta in ['Meta', 'meta', 'Mihomo', 'mihomo'])
         
-        # 如果不是允许的客户端，返回提示信息
-        if not any(client in ua for client in allowed_clients):
+        # 2. 判断是否是 Clash 客户端
+        is_clash = 'Clash' in ua or 'clash' in ua
+        
+        # 3. 允许的其他客户端（Stash, Shadowrocket 也支持 rule-providers）
+        is_other_allowed = any(client in ua for client in ['Stash', 'stash', 'Shadowrocket'])
+        
+        # 如果不是允许的客户端，返回错误
+        if not (is_clash or is_other_allowed):
             raise HTTPException(
                 status_code=403, 
                 detail="此订阅仅限 Clash 客户端访问。请在 Clash 中添加此订阅链接。"
             )
         
-        content = mgr.generate_subscription(token, format='yaml')
+        # 根据客户端类型决定是否启用 rule-providers
+        # Meta 内核和其他支持的客户端启用，原版 Clash 不启用
+        enable_rule_providers = is_meta or is_other_allowed
+        
+        content = mgr.generate_subscription(token, format='yaml', enable_rule_providers=enable_rule_providers)
         if content is None:
             raise HTTPException(status_code=404, detail="订阅不存在")
         
