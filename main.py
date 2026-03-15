@@ -700,28 +700,43 @@ class SubscriptionManager:
         
         output['proxies'] = proxies
         
-        # 动态生成 proxy-groups
+        # 使用原配置的 proxy-groups，但更新节点列表
+        original_groups = self.config.get('proxy-groups', [])
         proxy_names = [p['name'] for p in proxies]
-        output['proxy-groups'] = [
-            {
-                'name': 'Proxies',
-                'type': 'select',
-                'proxies': ['自动选择', '手动选择'] + proxy_names
-            },
-            {
-                'name': '自动选择',
-                'type': 'url-test',
-                'url': 'http://www.gstatic.com/generate_204',
-                'interval': 300,
-                'tolerance': 50,
-                'proxies': proxy_names
-            },
-            {
-                'name': '手动选择',
-                'type': 'select',
-                'proxies': proxy_names
-            }
-        ]
+        
+        if original_groups:
+            # 保留原配置的代理组，更新其中的节点
+            output['proxy-groups'] = []
+            for group in original_groups:
+                new_group = dict(group)
+                # 只更新包含节点列表的组（select/url-test 等）
+                if group.get('type') in ['select', 'url-test', 'fallback']:
+                    # 过滤掉不存在的节点
+                    valid_proxies = [p for p in group.get('proxies', []) if p in proxy_names or p in ['自动选择', '手动选择', 'Proxies']]
+                    new_group['proxies'] = valid_proxies
+                output['proxy-groups'].append(new_group)
+        else:
+            # 没有原配置，生成默认代理组
+            output['proxy-groups'] = [
+                {
+                    'name': 'Proxies',
+                    'type': 'select',
+                    'proxies': ['自动选择', '手动选择'] + proxy_names
+                },
+                {
+                    'name': '自动选择',
+                    'type': 'url-test',
+                    'url': 'http://www.gstatic.com/generate_204',
+                    'interval': 300,
+                    'tolerance': 50,
+                    'proxies': proxy_names
+                },
+                {
+                    'name': '手动选择',
+                    'type': 'select',
+                    'proxies': proxy_names
+                }
+            ]
         
         output['rules'] = self.config.get('rules', ['MATCH,Proxies'])
         
