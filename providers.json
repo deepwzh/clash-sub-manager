@@ -1,0 +1,30 @@
+{
+  "google": {
+    "name": "Google",
+    "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Google/Google.yaml",
+    "proxy_group": "美国",
+    "builtin_key": "google",
+    "added": "2026-03-15T07:45:35.640270"
+  },
+  "youtube": {
+    "name": "YouTube",
+    "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/YouTube/YouTube.yaml",
+    "proxy_group": "美国",
+    "builtin_key": "youtube",
+    "added": "2026-03-15T07:45:43.895880"
+  },
+  "github": {
+    "name": "GitHub",
+    "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GitHub/GitHub.yaml",
+    "proxy_group": "美国",
+    "builtin_key": "github",
+    "added": "2026-03-15T07:45:44.486081"
+  },
+  "telegram": {
+    "name": "Telegram",
+    "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml",
+    "proxy_group": "香港",
+    "builtin_key": "telegram",
+    "added": "2026-03-15T07:45:45.056332"
+  }
+}

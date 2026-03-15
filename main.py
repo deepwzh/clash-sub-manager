@@ -29,21 +29,111 @@ from fastapi.responses import PlainTextResponse, HTMLResponse, Response
 DEFAULT_CONFIG = Path(__file__).parent / "config.yaml"
 DEFAULT_DB = Path(__file__).parent / "subs.json"
 DEFAULT_SOURCES = Path(__file__).parent / "sources.json"
+DEFAULT_PROVIDERS = Path(__file__).parent / "providers.json"
+
+# 内置规则集 URL (blackmatrix7/ios_rule_script)
+RULE_PROVIDERS_URL = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash"
+
+BUILTIN_PROVIDERS = {
+    'google': {
+        'name': 'Google',
+        'url': f'{RULE_PROVIDERS_URL}/Google/Google.yaml',
+        'description': 'Google 服务 (搜索、Gmail、Drive 等)'
+    },
+    'youtube': {
+        'name': 'YouTube',
+        'url': f'{RULE_PROVIDERS_URL}/YouTube/YouTube.yaml',
+        'description': 'YouTube 视频平台'
+    },
+    'telegram': {
+        'name': 'Telegram',
+        'url': f'{RULE_PROVIDERS_URL}/Telegram/Telegram.yaml',
+        'description': 'Telegram 即时通讯'
+    },
+    'twitter': {
+        'name': 'Twitter',
+        'url': f'{RULE_PROVIDERS_URL}/Twitter/Twitter.yaml',
+        'description': 'Twitter/X 社交平台'
+    },
+    'github': {
+        'name': 'GitHub',
+        'url': f'{RULE_PROVIDERS_URL}/GitHub/GitHub.yaml',
+        'description': 'GitHub 代码托管'
+    },
+    'openai': {
+        'name': 'OpenAI',
+        'url': f'{RULE_PROVIDERS_URL}/OpenAI/OpenAI.yaml',
+        'description': 'OpenAI/ChatGPT'
+    },
+    'spotify': {
+        'name': 'Spotify',
+        'url': f'{RULE_PROVIDERS_URL}/Spotify/Spotify.yaml',
+        'description': 'Spotify 音乐'
+    },
+    'netflix': {
+        'name': 'Netflix',
+        'url': f'{RULE_PROVIDERS_URL}/Netflix/Netflix.yaml',
+        'description': 'Netflix 流媒体'
+    },
+    'discord': {
+        'name': 'Discord',
+        'url': f'{RULE_PROVIDERS_URL}/Discord/Discord.yaml',
+        'description': 'Discord 社区平台'
+    },
+    'tiktok': {
+        'name': 'TikTok',
+        'url': f'{RULE_PROVIDERS_URL}/TikTok/TikTok.yaml',
+        'description': 'TikTok 短视频'
+    },
+    'facebook': {
+        'name': 'Facebook',
+        'url': f'{RULE_PROVIDERS_URL}/Facebook/Facebook.yaml',
+        'description': 'Facebook 社交平台'
+    },
+    'instagram': {
+        'name': 'Instagram',
+        'url': f'{RULE_PROVIDERS_URL}/Instagram/Instagram.yaml',
+        'description': 'Instagram 图片社交'
+    },
+    'whatsapp': {
+        'name': 'WhatsApp',
+        'url': f'{RULE_PROVIDERS_URL}/WhatsApp/WhatsApp.yaml',
+        'description': 'WhatsApp 即时通讯'
+    },
+    'cloudflare': {
+        'name': 'Cloudflare',
+        'url': f'{RULE_PROVIDERS_URL}/Cloudflare/Cloudflare.yaml',
+        'description': 'Cloudflare CDN'
+    },
+    'notion': {
+        'name': 'Notion',
+        'url': f'{RULE_PROVIDERS_URL}/Notion/Notion.yaml',
+        'description': 'Notion 笔记'
+    },
+    'anthropic': {
+        'name': 'Anthropic',
+        'url': f'{RULE_PROVIDERS_URL}/Anthropic/Anthropic.yaml',
+        'description': 'Anthropic/Claude AI'
+    },
+}
 
 
 class SubscriptionManager:
     """订阅管理器核心类"""
     
-    def __init__(self, config_path: Path = DEFAULT_CONFIG, db_path: Path = DEFAULT_DB, sources_path: Path = DEFAULT_SOURCES):
+    def __init__(self, config_path: Path = DEFAULT_CONFIG, db_path: Path = DEFAULT_DB, sources_path: Path = DEFAULT_SOURCES, providers_path: Path = DEFAULT_PROVIDERS):
         self.config_path = config_path
         self.db_path = db_path
         self.sources_path = sources_path
+        self.providers_path = providers_path
         self.config = {}
         self.subscriptions = {}  # {token: {name, created, filters}}
         self.sources = []  # 远程订阅源列表
+        self.providers = {}  # 规则集 {provider_key: {name, url, proxy_group}}
         self._load_config()
         self._load_db()
         self._load_sources()
+        self._load_providers()
     
     def _load_config(self):
         """加载 Clash 配置文件"""
@@ -90,6 +180,17 @@ class SubscriptionManager:
         """保存远程订阅源"""
         with open(self.sources_path, 'w', encoding='utf-8') as f:
             json.dump(self.sources, f, ensure_ascii=False, indent=2)
+    
+    def _load_providers(self):
+        """加载规则集配置"""
+        if self.providers_path.exists():
+            with open(self.providers_path, 'r', encoding='utf-8') as f:
+                self.providers = json.load(f)
+    
+    def _save_providers(self):
+        """保存规则集配置"""
+        with open(self.providers_path, 'w', encoding='utf-8') as f:
+            json.dump(self.providers, f, ensure_ascii=False, indent=2)
     
     def _generate_token(self, length: int = 16) -> str:
         """生成随机订阅 token"""
@@ -398,6 +499,67 @@ class SubscriptionManager:
         self._save_sources()
         return results
     
+    # === 规则集管理 ===
+    
+    def list_builtin_providers(self) -> dict:
+        """列出内置规则集"""
+        return BUILTIN_PROVIDERS
+    
+    def add_provider(self, key: str, proxy_group: str, custom_url: str = None) -> dict:
+        """添加规则集
+        
+        Args:
+            key: 规则集键名 (内置规则集名或自定义名)
+            proxy_group: 目标代理组
+            custom_url: 自定义规则集 URL (可选，不传则使用内置规则集)
+        """
+        # 检查是否是内置规则集
+        if key in BUILTIN_PROVIDERS:
+            builtin = BUILTIN_PROVIDERS[key]
+            provider = {
+                'name': builtin['name'],
+                'url': builtin['url'],
+                'proxy_group': proxy_group,
+                'builtin_key': key,
+                'added': datetime.now().isoformat()
+            }
+        elif custom_url:
+            provider = {
+                'name': key,
+                'url': custom_url,
+                'proxy_group': proxy_group,
+                'builtin_key': None,
+                'added': datetime.now().isoformat()
+            }
+        else:
+            raise ValueError(f"未知规则集: {key}。请提供 --url 参数或使用内置规则集。")
+        
+        self.providers[key] = provider
+        self._save_providers()
+        return provider
+    
+    def remove_provider(self, key: str) -> bool:
+        """删除规则集"""
+        if key in self.providers:
+            del self.providers[key]
+            self._save_providers()
+            return True
+        return False
+    
+    def list_providers(self) -> dict:
+        """列出已添加的规则集"""
+        return self.providers
+    
+    def get_proxy_groups(self) -> List[str]:
+        """获取所有可用的代理组名称"""
+        groups = set()
+        for g in self.config.get('proxy-groups', []):
+            groups.add(g.get('name'))
+        # 添加常用组
+        groups.add('DIRECT')
+        groups.add('REJECT')
+        return sorted(list(groups))
+    
     # === 节点管理 ===
     
     def list_proxies(self) -> list:
@@ -562,6 +724,42 @@ class SubscriptionManager:
         ]
         
         output['rules'] = self.config.get('rules', ['MATCH,Proxies'])
+        
+        # 添加 rule-providers（如果有）
+        if self.providers:
+            rule_providers = {}
+            provider_rules = []
+            
+            for key, provider in self.providers.items():
+                provider_name = provider['name']
+                # 生成规则集配置
+                rule_providers[provider_name] = {
+                    'type': 'http',
+                    'behavior': 'classical',
+                    'url': provider['url'],
+                    'path': f'./ruleset/{provider_name}',
+                    'interval': 86400
+                }
+                # 生成规则引用
+                provider_rules.append(f'RULE-SET,{provider_name},{provider["proxy_group"]}')
+            
+            output['rule-providers'] = rule_providers
+            
+            # 将规则集规则插入到 MATCH 之前
+            base_rules = output['rules']
+            # 找到 MATCH 规则的位置
+            match_idx = None
+            for i, rule in enumerate(base_rules):
+                if rule.startswith('MATCH'):
+                    match_idx = i
+                    break
+            
+            if match_idx is not None:
+                # 在 MATCH 之前插入规则集规则
+                output['rules'] = base_rules[:match_idx] + provider_rules + base_rules[match_idx:]
+            else:
+                # 没有找到 MATCH，直接追加
+                output['rules'] = base_rules + provider_rules
         
         if format == 'base64':
             # Base64 编码的节点链接
@@ -976,6 +1174,75 @@ def cli_serve(args):
     uvicorn.run(app, host=args.host, port=args.port)
 
 
+# === 规则集命令 ===
+
+def cli_provider_list_builtin(args):
+    """列出内置规则集"""
+    mgr = SubscriptionManager()
+    builtin = mgr.list_builtin_providers()
+    
+    print("\n内置规则集:\n")
+    for key, info in builtin.items():
+        print(f"  • {key}")
+        print(f"      名称: {info['name']}")
+        print(f"      说明: {info['description']}")
+        print()
+
+
+def cli_provider_list(args):
+    """列出已添加的规则集"""
+    mgr = SubscriptionManager()
+    providers = mgr.list_providers()
+    
+    if not providers:
+        print("\n暂无规则集")
+        print("使用 'provider-add <规则集名> <代理组>' 添加规则集")
+        print("使用 'provider-list-builtin' 查看内置规则集\n")
+        return
+    
+    print(f"\n已添加规则集 ({len(providers)}):\n")
+    for key, info in providers.items():
+        builtin_tag = " [内置]" if info.get('builtin_key') else ""
+        print(f"  • {key}{builtin_tag}")
+        print(f"      名称: {info['name']}")
+        print(f"      代理组: {info['proxy_group']}")
+        print(f"      URL: {info['url']}")
+        print()
+
+
+def cli_provider_add(args):
+    """添加规则集"""
+    mgr = SubscriptionManager()
+    
+    # 检查代理组是否存在
+    groups = mgr.get_proxy_groups()
+    if args.proxy_group not in groups:
+        print(f"\n⚠️  警告: 代理组 '{args.proxy_group}' 不存在于当前配置")
+        print(f"   可用代理组: {', '.join(groups)}\n")
+    
+    try:
+        provider = mgr.add_provider(args.key, args.proxy_group, args.url)
+        print(f"\n✓ 规则集添加成功!")
+        print(f"  键名: {args.key}")
+        print(f"  名称: {provider['name']}")
+        print(f"  代理组: {provider['proxy_group']}")
+        print(f"  URL: {provider['url']}")
+        print()
+    except ValueError as e:
+        print(f"\n✗ {e}")
+        print("使用 'provider-list-builtin' 查看内置规则集\n")
+
+
+def cli_provider_remove(args):
+    """删除规则集"""
+    mgr = SubscriptionManager()
+    
+    if mgr.remove_provider(args.key):
+        print(f"✓ 规则集已删除: {args.key}")
+    else:
+        print(f"✗ 规则集不存在: {args.key}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Clash 订阅管理器", formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest='command', help='命令')
@@ -1051,6 +1318,24 @@ def main():
     p_sub_del = subparsers.add_parser('sub-delete', help='删除订阅')
     p_sub_del.add_argument('token', help='订阅 Token')
     p_sub_del.set_defaults(func=cli_delete_sub)
+    
+    # === 规则集管理 ===
+    
+    p_prov_builtin = subparsers.add_parser('provider-list-builtin', help='列出内置规则集')
+    p_prov_builtin.set_defaults(func=cli_provider_list_builtin)
+    
+    p_prov_list = subparsers.add_parser('provider-list', help='列出已添加的规则集')
+    p_prov_list.set_defaults(func=cli_provider_list)
+    
+    p_prov_add = subparsers.add_parser('provider-add', help='添加规则集')
+    p_prov_add.add_argument('key', help='规则集键名 (内置规则集名或自定义名)')
+    p_prov_add.add_argument('proxy_group', help='目标代理组')
+    p_prov_add.add_argument('--url', help='自定义规则集 URL (不传则使用内置规则集)')
+    p_prov_add.set_defaults(func=cli_provider_add)
+    
+    p_prov_remove = subparsers.add_parser('provider-remove', help='删除规则集')
+    p_prov_remove.add_argument('key', help='规则集键名')
+    p_prov_remove.set_defaults(func=cli_provider_remove)
     
     # === 服务 ===
     

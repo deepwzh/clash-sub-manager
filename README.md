@@ -45,6 +45,48 @@ clash-sub sub-create "手机订阅" --base-url "https://your-domain/clash-sub"
 
 ## 命令详解
 
+### 规则集管理
+
+```bash
+# 列出内置规则集
+clash-sub provider-list-builtin
+
+# 添加规则集（使用内置规则集）
+clash-sub provider-add google 美国
+clash-sub provider-add youtube 美国
+clash-sub provider-add telegram 香港
+clash-sub provider-add github 美国
+
+# 添加自定义规则集
+clash-sub provider-add my-rules 美国 --url "https://example.com/rules.yaml"
+
+# 列出已添加的规则集
+clash-sub provider-list
+
+# 删除规则集
+clash-sub provider-remove google
+```
+
+内置规则集：
+| 键名 | 说明 |
+|------|------|
+| google | Google 服务 |
+| youtube | YouTube 视频平台 |
+| telegram | Telegram 即时通讯 |
+| twitter | Twitter/X 社交平台 |
+| github | GitHub 代码托管 |
+| openai | OpenAI/ChatGPT |
+| anthropic | Anthropic/Claude AI |
+| spotify | Spotify 音乐 |
+| netflix | Netflix 流媒体 |
+| discord | Discord 社区平台 |
+| tiktok | TikTok 短视频 |
+| facebook | Facebook 社交平台 |
+| instagram | Instagram 图片社交 |
+| whatsapp | WhatsApp 即时通讯 |
+| cloudflare | Cloudflare CDN |
+| notion | Notion 笔记 |
+
 ### 节点管理
 
 ```bash
