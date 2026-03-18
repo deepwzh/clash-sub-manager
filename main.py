@@ -721,12 +721,15 @@ class SubscriptionManager:
         if original_groups:
             # 保留原配置的代理组，更新其中的节点
             output['proxy-groups'] = []
+            # 收集所有代理组名称
+            group_names = [g.get('name') for g in original_groups if g.get('name')]
             for group in original_groups:
                 new_group = dict(group)
                 # 只更新包含节点列表的组（select/url-test 等）
                 if group.get('type') in ['select', 'url-test', 'fallback']:
-                    # 过滤掉不存在的节点
-                    valid_proxies = [p for p in group.get('proxies', []) if p in proxy_names or p in ['自动选择', '手动选择', 'Proxies']]
+                    # 过滤掉不存在的节点，但保留有效的代理组引用
+                    valid_proxies = [p for p in group.get('proxies', []) 
+                                    if p in proxy_names or p in group_names or p in ['自动选择', '手动选择', 'Proxies', 'DIRECT', 'REJECT']]
                     new_group['proxies'] = valid_proxies
                 output['proxy-groups'].append(new_group)
         else:
@@ -1138,12 +1141,9 @@ def cli_serve(args):
         # 3. 允许的其他客户端（Stash, Shadowrocket 也支持 rule-providers）
         is_other_allowed = any(client in ua for client in ['Stash', 'stash', 'Shadowrocket'])
         
-        # 如果不是允许的客户端，返回错误
+        # 如果不是允许的客户端，返回 404（隐藏订阅存在）
         if not (is_clash or is_other_allowed):
-            raise HTTPException(
-                status_code=403, 
-                detail="此订阅仅限 Clash 客户端访问。请在 Clash 中添加此订阅链接。"
-            )
+            raise HTTPException(status_code=404)
         
         # 根据客户端类型决定是否启用 rule-providers
         # Meta 内核和其他支持的客户端启用，原版 Clash 不启用
@@ -1182,10 +1182,7 @@ def cli_serve(args):
         allowed_clients = ['Clash', 'clash', 'Stash', 'stash', 'Shadowrocket', 'v2ray', 'V2Ray']
         
         if not any(client in ua for client in allowed_clients):
-            raise HTTPException(
-                status_code=403, 
-                detail="此订阅仅限 Clash/V2Ray 客户端访问。"
-            )
+            raise HTTPException(status_code=404)
         
         content = mgr.generate_subscription(token, format='base64')
         if content is None:
