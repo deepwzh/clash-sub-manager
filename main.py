@@ -1084,6 +1084,11 @@ def cli_serve(args):
     mgr = SubscriptionManager()
     app = FastAPI(title="Clash Subscription Manager")
     
+    # 隐藏 404 响应体，返回空响应
+    @app.exception_handler(404)
+    async def not_found_handler(request, exc):
+        return Response(status_code=404)
+    
     @app.get("/", response_class=HTMLResponse)
     async def index():
         return f"""
